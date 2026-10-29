@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slacker Toolkit</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--tx:#1f2937;--mu:#6b7280;--ac:#4f8cff;--ok:#22c55e;--bd:#e5e7eb;--bad:#ef4444;--fish:#f59e0b;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1420;--card:#171d2c;--tx:#e5e7eb;--mu:#9aa3b2;--ac:#6ea0ff;--ok:#34d399;--bd:#2a3347;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+h1{font-size:22px;margin:0}
+h2{font-size:15px;margin:0 0 10px;color:var(--mu);font-weight:600}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mu{color:var(--mu);font-size:13px}
+input,button{font:inherit;color:inherit}
+input[type=time],input[type=text]{background:transparent;border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
+input[type=text]{flex:1;min-width:120px}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+button.on{background:var(--fish)}
+.big{font-size:46px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;margin:10px 0 2px}
+.sub{text-align:center;color:var(--mu);margin-bottom:8px}
+.bar{position:relative;height:10px;background:var(--bd);border-radius:6px;margin:18px 0 12px}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--ok);border-radius:6px;width:0}
+.bar b{position:absolute;top:-10px;font-size:18px;font-weight:400;transform:translateX(-50%)}
+#msg{font-size:16px;margin-bottom:10px}
+.seg{display:flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.seg button{background:transparent;color:var(--tx);border-radius:0;padding:6px 12px}
+.seg button.act{background:var(--ac);color:#fff}
+.seg button.act.f{background:var(--fish)}
+.timer{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;margin:10px 0}
+ul{list-style:none;padding:0;margin:6px 0}
+li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--bd);font-size:14px}
+li span.x{cursor:pointer;color:var(--mu)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:10px 0}
+.stats div{background:var(--bg);border-radius:10px;padding:8px 10px}
+.stats b{display:block;font-size:17px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.wd{text-align:center;color:var(--mu);font-size:12px}
+.d{min-height:50px;border:1px solid var(--bd);border-radius:8px;padding:3px 5px;font-size:12px;cursor:pointer}
+.d small{display:block;font-size:11px;color:var(--mu)}
+.d.sel{outline:2px solid var(--ac)}
+.d.today{border-color:var(--ac)}
+.l1{background:color-mix(in srgb,var(--fish) 30%,transparent)}
+.l2{background:color-mix(in srgb,var(--ok) 35%,transparent)}
+.l3{background:color-mix(in srgb,var(--bad) 30%,transparent)}
+.lg{font-size:12px;color:var(--mu);margin-top:8px}
+#boss{display:none;position:fixed;inset:0;background:#fff;color:#222;z-index:9;padding:20px;overflow:auto;font:13px Calibri,Arial,sans-serif}
+#boss table{border-collapse:collapse;width:100%}
+#boss td,#boss th{border:1px solid #cfd4da;padding:4px 8px;text-align:right}
+#boss th{background:#e9edf2}
+#boss td:first-child{text-align:left}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>Slacker Toolkit 🐟</h1><button class="ghost" id="bossBtn">Boss key (Esc)</button></header>
+
+<section class="card">
+  <h2>Today's clock-in · Countdown to off-work</h2>
+  <div class="row"><input type="time" id="inT"><button id="nowBtn" class="ghost">Clock in now</button><span class="mu">Flexible hours · 12:30–14:00 lunch not counted · 8h per day</span></div>
+  <div class="big" id="cd">--:--:--</div>
+  <div class="sub" id="offInfo">Clock in first and I'll work out when you can leave</div>
+  <div class="bar"><i id="fill"></i><b id="fishE">🐟</b></div>
+  <div class="sub" id="msg"></div>
+  <div class="row" style="justify-content:center"><button id="outBtn">Clock out</button><span class="mu" id="netInfo"></span></div>
+</section>
+
+<section class="card">
+  <h2>Work timer · Time log</h2>
+  <div class="row">
+    <div class="seg" id="seg"><button data-t="w" class="act">Work</button><button data-t="f">Slack</button></div>
+    <input type="text" id="tName" placeholder="What are you doing? (optional)">
+    <button id="tBtn">Start</button>
+  </div>
+  <div class="timer" id="tClock">00:00:00</div>
+  <div class="mu" id="tSum"></div>
+  <ul id="tList"></ul>
+</section>
+
+<section class="card">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0" id="mTitle"></h2>
+    <div class="row"><button class="ghost" id="prev">‹</button><button class="ghost" id="next">›</button><button class="ghost" id="exp">Export CSV</button></div></div>
+  <div class="stats" id="stats"></div>
+  <div class="cal" id="cal"></div>
+  <div class="lg">Colors: yellow = under 8h · green = on target · red = over 9h. Click a day for details (about two months kept locally).</div>
+  <div id="detail" style="margin-top:10px"></div>
+</section>
+</div>
+
+<div id="boss"><b>Q3_Data_Summary.xlsx</b><br><br>
+<table><tr><th>Region</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Total</th></tr>
+<tr><td>East</td><td>128,400</td><td>131,250</td><td>142,780</td><td>402,430</td></tr>
+<tr><td>South</td><td>96,120</td><td>101,330</td><td>99,870</td><td>297,320</td></tr>
+<tr><td>North</td><td>110,560</td><td>108,940</td><td>115,210</td><td>334,710</td></tr>
+<tr><td>West</td><td>64,300</td><td>70,110</td><td>73,640</td><td>208,050</td></tr>
+<tr><td>Total</td><td>399,380</td><td>411,630</td><td>431,500</td><td>1,242,510</td></tr></table></div>
+
+<script>
+const LS='moyu_v1',LS_S=750,LS_E=840,NEED=480,KEEP=62;
+const $=s=>document.querySelector(s);
+const pad=n=>String(n).padStart(2,'0');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let db=load(),type='w',bossOn=false;
+let vy=new Date().getFullYear(),vm=new Date().getMonth(),sel=key(new Date());
+
+function load(){let d=null;try{d=JSON.parse(localStorage.getItem(LS))}catch(e){}
+  if(!d||!d.days)d={days:{},run:null};
+  const lim=Date.now()-KEEP*864e5;
+  Object.keys(d.days).forEach(k=>{if(new Date(k+'T00:00:00').getTime()<lim)delete d.days[k]});
+  return d}
+function save(){try{localStorage.setItem(LS,JSON.stringify(db))}catch(e){}}
+function key(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function toMin(h){const a=h.split(':').map(Number);return a[0]*60+a[1]}
+function hm(m){m=Math.round(m);return pad(Math.floor(m/60)%24)+':'+pad(m%60)}
+function dur(sec){sec=Math.max(0,Math.round(sec));return Math.floor(sec/3600)+'h'+pad(Math.floor(sec%3600/60))+'m'}
+function hms(sec){sec=Math.max(0,Math.floor(sec));return pad(Math.floor(sec/3600))+':'+pad(Math.floor(sec%3600/60))+':'+pad(sec%60)}
+// Off-work time: accumulate 8h of work from clock-in, skipping lunch
+function offMin(s){if(s>=LS_E)return s+NEED;if(s>=LS_S)return LS_E+NEED;const a=LS_S-s;return a>=NEED?s+NEED:LS_E+(NEED-a)}
+// Net work minutes (lunch excluded)
+function worked(s,e){if(e<=s)return 0;return e-s-Math.max(0,Math.min(e,LS_E)-Math.max(s,LS_S))}
+function day(k){return db.days[k]||(db.days[k]={})}
+function sessSum(r,t){return(r.ss||[]).filter(x=>x.t===t).reduce((a,x)=>a+(x.e-x.s),0)/1000}
+
+function tick(){
+  const now=new Date(),k=key(now),r=db.days[k]||{};
+  const ns=now.getHours()*3600+now.getMinutes()*60+now.getSeconds();
+  if(document.activeElement!==$('#inT'))$('#inT').value=r.in||'';
+  let rem=null,pct=0,msg='Clock in first ☕',net=0;
+  if(r.in){
+    const im=toMin(r.in),off=offMin(im);
+    rem=off*60-ns;
+    net=worked(im,ns/60)*60;
+    pct=Math.min(1,net/(NEED*60));
+    $('#offInfo').textContent='Off-work at '+hm(off)+(im*60>ns?' (clock-in time is later than now)':'');
+    if(r.out){
+      const n=worked(im,toMin(r.out))*60;
+      $('#cd').textContent='Done for today';
+      msg='🏃 Left at '+r.out+', net '+dur(n)+(n>=NEED*60?' — target met':' — short by '+dur(NEED*60-n));
+      pct=Math.min(1,n/(NEED*60));
+    }else if(rem>0){
+      $('#cd').textContent=hms(rem);
+      msg=ns>=LS_S*60&&ns<LS_E*60?'🍚 Lunch break — not counted as work time':
+        rem>14400?'Long way to go — go refill your water 💧':rem>7200?'Stay steady, don\'t get caught 👀':rem>3600?'About an hour left — look busy 🤫':
+        rem>1800?'Wrap-up time — tidy your desk 🧹':rem>600?'Final sprint — get ready to shut down 💻':'Already gone in spirit 🏃';
+    }else{
+      $('#cd').textContent='+'+hms(-rem);
+      msg='🎉 You can go home! Over by '+dur(-rem)+' — hit "Clock out"';
+    }
+  }else{$('#cd').textContent='--:--:--';$('#offInfo').textContent='Clock in first and I\'ll work out when you can leave'}
+  $('#msg').textContent=msg;
+  $('#fill').style.width=pct*100+'%';
+  $('#fishE').style.left=Math.max(2,Math.min(98,pct*100))+'%';
+  $('#netInfo').textContent=r.in?'Net today '+dur(r.out?worked(toMin(r.in),toMin(r.out))*60:net)+' / 8h':'';
+  $('#outBtn').textContent=r.out?'Undo clock-out':'Clock out';
+  $('#outBtn').style.display=r.in?'':'none';
+  // Timer
+  if(db.run){$('#tClock').textContent=hms((Date.now()-db.run.s)/1000);$('#tBtn').textContent='Stop';$('#tBtn').className='on'}
+  else{$('#tClock').textContent='00:00:00';$('#tBtn').textContent='Start';$('#tBtn').className=''}
+  document.title=bossOn?'Q3_Data_Summary.xlsx - Excel':(r.in&&!r.out&&rem!==null?(rem>0?'⏳ '+hms(rem)+' to go':'🎉 Time to go'):'Slacker Toolkit');
+}
+
+function renderTimer(){
+  const r=db.days[key(new Date())]||{},ss=r.ss||[];
+  $('#tSum').textContent='Today: work '+dur(sessSum(r,'w'))+' · slack '+dur(sessSum(r,'f'));
+  $('#tList').innerHTML=ss.map((x,i)=>'<li><span>'+(x.t==='f'?'🐟 ':'💼 ')+esc(x.n||(x.t==='f'?'Slacking':'Working'))+'　<span class="mu">'+hm(new Date(x.s).getHours()*60+new Date(x.s).getMinutes())+'</span></span><span>'+dur((x.e-x.s)/1000)+' <span class="x" data-i="'+i+'">✕</span></span></li>').join('')||'<li class="mu">No entries yet</li>';
+}
+
+function dayNet(k,r){
+  if(!r||!r.in)return null;
+  if(r.out)return worked(toMin(r.in),toMin(r.out));
+  if(k===key(new Date())){const n=new Date();return worked(toMin(r.in),n.getHours()*60+n.getMinutes())}
+  return null}
+
+function renderMonth(){
+  $('#mTitle').textContent=['January','February','March','April','May','June','July','August','September','October','November','December'][vm]+' '+vy;
+  const days=new Date(vy,vm+1,0).getDate(),off=(new Date(vy,vm,1).getDay()+6)%7,today=key(new Date());
+  let h=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div class="wd">'+d+'</div>').join('');
+  for(let i=0;i<off;i++)h+='<div></div>';
+  let n=0,tin=0,cin=0,tout=0,cout=0,tnet=0,tf=0,tw=0;
+  for(let d=1;d<=days;d++){
+    const k=vy+'-'+pad(vm+1)+'-'+pad(d),r=db.days[k],net=dayNet(k,r);
+    let c='';if(net!==null)c=net<NEED-5?'l1':net<=NEED+60?'l2':'l3';
+    if(r&&r.in){n++;tin+=toMin(r.in);cin++}
+    if(r&&r.out){tout+=toMin(r.out);cout++}
+    if(net!==null&&r.out)tnet+=net;
+    if(r){tf+=sessSum(r,'f');tw+=sessSum(r,'w')}
+    h+='<div class="d '+c+(k===sel?' sel':'')+(k===today?' today':'')+'" data-k="'+k+'">'+d+'<small>'+(net!==null?(net/60).toFixed(1)+'h':'')+'</small></div>';
+  }
+  $('#cal').innerHTML=h;
+  $('#stats').innerHTML=[['Days worked',n+' d'],['Avg. start',cin?hm(tin/cin):'--'],['Avg. finish',cout?hm(tout/cout):'--'],['Total net hours',dur(tnet*60)],['Daily avg. net',cout?dur(tnet/cout*60):'--'],['Timer · work',dur(tw)],['Timer · slack',dur(tf)]].map(a=>'<div>'+a[0]+'<b>'+a[1]+'</b></div>').join('');
+  renderDetail();
+}
+function renderDetail(){
+  const r=db.days[sel];
+  if(!r||(!r.in&&!(r.ss||[]).length)){$('#detail').innerHTML='<span class="mu">'+sel+': no entries</span>';return}
+  const net=dayNet(sel,r);
+  $('#detail').innerHTML='<b>'+sel+'</b> · In '+(r.in||'--')+' · Out '+(r.out||'--')+' · Net '+(net!==null?dur(net*60):'--')+
+    '<ul>'+(r.ss||[]).map(x=>'<li><span>'+(x.t==='f'?'🐟 ':'💼 ')+esc(x.n||(x.t==='f'?'Slacking':'Working'))+'</span><span>'+dur((x.e-x.s)/1000)+'</span></li>').join('')+'</ul>';
+}
+function render(){renderTimer();renderMonth();tick()}
+
+$('#inT').addEventListener('change',e=>{if(e.target.value){day(key(new Date())).in=e.target.value;save();render()}});
+$('#nowBtn').onclick=()=>{const n=new Date();day(key(n)).in=pad(n.getHours())+':'+pad(n.getMinutes());save();render()};
+$('#outBtn').onclick=()=>{const r=day(key(new Date())),n=new Date();if(r.out)delete r.out;else r.out=pad(n.getHours())+':'+pad(n.getMinutes());save();render()};
+$('#seg').onclick=e=>{const t=e.target.dataset.t;if(!t)return;type=t;[...$('#seg').children].forEach(b=>b.className=b.dataset.t===t?'act'+(t==='f'?' f':''):'')};
+$('#tBtn').onclick=()=>{
+  if(db.run){const r=db.run;day(key(new Date(r.s))).ss=(db.days[key(new Date(r.s))].ss||[]).concat({t:r.t,n:r.n,s:r.s,e:Date.now()});db.run=null}
+  else{db.run={t:type,n:$('#tName').value.trim(),s:Date.now()}}
+  save();render()};
+$('#tList').onclick=e=>{const i=e.target.dataset.i;if(i===undefined)return;db.days[key(new Date())].ss.splice(+i,1);save();render()};
+$('#prev').onclick=()=>{vm--;if(vm<0){vm=11;vy--}renderMonth()};
+$('#next').onclick=()=>{vm++;if(vm>11){vm=0;vy++}renderMonth()};
+$('#cal').onclick=e=>{const k=e.target.closest('.d');if(!k)return;sel=k.dataset.k;renderMonth()};
+$('#exp').onclick=()=>{
+  const rows=['Date,In,Out,Net (min),Work timer (min),Slack (min)'];
+  Object.keys(db.days).sort().forEach(k=>{const r=db.days[k],n=dayNet(k,r);rows.push([k,r.in||'',r.out||'',n===null?'':n,Math.round(sessSum(r,'w')/60),Math.round(sessSum(r,'f')/60)].join(','))});
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'}));a.download='moyu-'+key(new Date())+'.csv';a.click()};
+function boss(on){bossOn=on===undefined?!bossOn:on;$('#boss').style.display=bossOn?'block':'none';tick()}
+$('#bossBtn').onclick=()=>boss();
+$('#boss').onclick=()=>boss(false);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')boss()});
+
+render();setInterval(tick,1000);
+</script>
+</body>
+</html>
