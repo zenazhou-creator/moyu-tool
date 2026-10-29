@@ -17,7 +17,7 @@ h2{font-size:15px;margin:0 0 10px;color:var(--mu);font-weight:600}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .mu{color:var(--mu);font-size:13px}
 input,button{font:inherit;color:inherit}
-input[type=time],input[type=text]{background:transparent;border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
+input[type=time],input[type=text],input[type=number]{background:transparent;border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
 input[type=text]{flex:1;min-width:120px}
 button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
 button.ghost{background:transparent;color:var(--tx);border:1px solid var(--bd)}
@@ -54,6 +54,11 @@ li span.x{cursor:pointer;color:var(--mu)}
 #boss td,#boss th{border:1px solid #cfd4da;padding:4px 8px;text-align:right}
 #boss th{background:#e9edf2}
 #boss td:first-child{text-align:left}
+.q1{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;gap:8px;flex-wrap:wrap}
+.q1 b{font-size:28px}
+.qbar{height:16px;background:var(--bd);border-radius:8px;overflow:hidden;margin:8px 0}
+.qbar i{display:block;height:100%;width:100%;background:var(--ok);border-radius:8px;transition:width .4s}
+.qbar i.w{background:var(--fish)}.qbar i.o{background:var(--bad)}
 </style>
 </head>
 <body>
@@ -83,12 +88,17 @@ li span.x{cursor:pointer;color:var(--mu)}
 </section>
 
 <section class="card">
-  <div class="row" style="justify-content:space-between"><h2 style="margin:0" id="mTitle"></h2>
-    <div class="row"><button class="ghost" id="prev">‹</button><button class="ghost" id="next">›</button><button class="ghost" id="exp">Export CSV</button></div></div>
+  <h2>Monthly work quota</h2>
+  <div class="row"><span class="mu">Max work this month:</span><input type="number" id="qIn" min="1" max="300" step="1" style="width:80px"><span class="mu">hours (a soft limit — you can go over, but we'll judge you)</span></div>
+  <div class="q1"><b id="qLeft"></b><span class="mu" id="qUsed"></span></div>
+  <div class="qbar"><i id="qFill"></i></div>
+  <div class="sub" id="qTip"></div>
   <div class="stats" id="stats"></div>
-  <div class="cal" id="cal"></div>
-  <div class="lg">Colors: yellow = under 8h · green = on target · red = over 9h. Click a day for details (about two months kept locally).</div>
-  <div id="detail" style="margin-top:10px"></div>
+</section>
+
+<section class="card">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0" id="mTitle"></h2><button class="ghost" id="exp">Export CSV</button></div>
+  <ul id="log"></ul>
 </section>
 </div>
 
@@ -106,10 +116,10 @@ const $=s=>document.querySelector(s);
 const pad=n=>String(n).padStart(2,'0');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let db=load(),type='w',bossOn=false;
-let vy=new Date().getFullYear(),vm=new Date().getMonth(),sel=key(new Date());
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function load(){let d=null;try{d=JSON.parse(localStorage.getItem(LS))}catch(e){}
-  if(!d||!d.days)d={days:{},run:null};
+  if(!d||!d.days)d={days:{},run:null};if(!d.quota)d.quota=100;
   const lim=Date.now()-KEEP*864e5;
   Object.keys(d.days).forEach(k=>{if(new Date(k+'T00:00:00').getTime()<lim)delete d.days[k]});
   return d}
@@ -170,39 +180,37 @@ function renderTimer(){
   $('#tList').innerHTML=ss.map((x,i)=>'<li><span>'+(x.t==='f'?'🐟 ':'💼 ')+esc(x.n||(x.t==='f'?'Slacking':'Working'))+'　<span class="mu">'+hm(new Date(x.s).getHours()*60+new Date(x.s).getMinutes())+'</span></span><span>'+dur((x.e-x.s)/1000)+' <span class="x" data-i="'+i+'">✕</span></span></li>').join('')||'<li class="mu">No entries yet</li>';
 }
 
-function dayNet(k,r){
-  if(!r||!r.in)return null;
-  if(r.out)return worked(toMin(r.in),toMin(r.out));
-  if(k===key(new Date())){const n=new Date();return worked(toMin(r.in),n.getHours()*60+n.getMinutes())}
-  return null}
-
-function renderMonth(){
-  $('#mTitle').textContent=['January','February','March','April','May','June','July','August','September','October','November','December'][vm]+' '+vy;
-  const days=new Date(vy,vm+1,0).getDate(),off=(new Date(vy,vm,1).getDay()+6)%7,today=key(new Date());
-  let h=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div class="wd">'+d+'</div>').join('');
-  for(let i=0;i<off;i++)h+='<div></div>';
-  let n=0,tin=0,cin=0,tout=0,cout=0,tnet=0,tf=0,tw=0;
-  for(let d=1;d<=days;d++){
-    const k=vy+'-'+pad(vm+1)+'-'+pad(d),r=db.days[k],net=dayNet(k,r);
-    let c='';if(net!==null)c=net<NEED-5?'l1':net<=NEED+60?'l2':'l3';
-    if(r&&r.in){n++;tin+=toMin(r.in);cin++}
-    if(r&&r.out){tout+=toMin(r.out);cout++}
-    if(net!==null&&r.out)tnet+=net;
-    if(r){tf+=sessSum(r,'f');tw+=sessSum(r,'w')}
-    h+='<div class="d '+c+(k===sel?' sel':'')+(k===today?' today':'')+'" data-k="'+k+'">'+d+'<small>'+(net!==null?(net/60).toFixed(1)+'h':'')+'</small></div>';
-  }
-  $('#cal').innerHTML=h;
-  $('#stats').innerHTML=[['Days worked',n+' d'],['Avg. start',cin?hm(tin/cin):'--'],['Avg. finish',cout?hm(tout/cout):'--'],['Total net hours',dur(tnet*60)],['Daily avg. net',cout?dur(tnet/cout*60):'--'],['Timer · work',dur(tw)],['Timer · slack',dur(tf)]].map(a=>'<div>'+a[0]+'<b>'+a[1]+'</b></div>').join('');
-  renderDetail();
-}
-function renderDetail(){
-  const r=db.days[sel];
-  if(!r||(!r.in&&!(r.ss||[]).length)){$('#detail').innerHTML='<span class="mu">'+sel+': no entries</span>';return}
-  const net=dayNet(sel,r);
-  $('#detail').innerHTML='<b>'+sel+'</b> · In '+(r.in||'--')+' · Out '+(r.out||'--')+' · Net '+(net!==null?dur(net*60):'--')+
-    '<ul>'+(r.ss||[]).map(x=>'<li><span>'+(x.t==='f'?'🐟 ':'💼 ')+esc(x.n||(x.t==='f'?'Slacking':'Working'))+'</span><span>'+dur((x.e-x.s)/1000)+'</span></li>').join('')+'</ul>';
-}
-function render(){renderTimer();renderMonth();tick()}
+function prefix(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'}
+// Actual work / slack seconds for this month and today (running timer included)
+function totals(){
+  const now=new Date(),pre=prefix(now),tk=key(now),t={w:0,f:0,tw:0,tf:0};
+  Object.keys(db.days).forEach(k=>{if(k.indexOf(pre)!==0)return;const r=db.days[k],w=sessSum(r,'w'),f=sessSum(r,'f');t.w+=w;t.f+=f;if(k===tk){t.tw=w;t.tf=f}});
+  if(db.run){const e=(Date.now()-db.run.s)/1000,k=key(new Date(db.run.s));
+    if(k.indexOf(pre)===0){t[db.run.t]+=e;if(k===tk)t[db.run.t==='w'?'tw':'tf']+=e}}
+  return t}
+function weekdaysLeft(){const n=new Date(),last=new Date(n.getFullYear(),n.getMonth()+1,0).getDate();let c=0;
+  for(let d=n.getDate();d<=last;d++){const w=new Date(n.getFullYear(),n.getMonth(),d).getDay();if(w>0&&w<6)c++}
+  return Math.max(1,c)}
+function renderQuota(){
+  const q=db.quota*3600,t=totals(),left=q-t.w,pct=t.w/q,f=$('#qFill');
+  if($('#qIn')!==document.activeElement)$('#qIn').value=db.quota;
+  if(left>=0){f.style.width=Math.max(0,left/q*100)+'%';f.className=pct>=0.8?'w':''}else{f.style.width='100%';f.className='o'}
+  $('#qLeft').textContent=left>=0?dur(left)+' left':dur(-left)+' over';
+  $('#qUsed').textContent=dur(t.w)+' of '+db.quota+'h used ('+Math.round(pct*100)+'%)';
+  $('#qTip').textContent=pct>1?'Quota exceeded! HR has been notified (not really). Go touch grass 🌱':
+    pct>=0.8?'Work quota running low. Please stop working immediately — doctor\'s orders 🩺':
+    pct>=0.5?'Over half used. Consider a strategic nap 😴':
+    pct>0?'Quota looking healthy. Do less, brag more 😎':'Fresh month, full quota. Guard it with your life 🛡️';
+  const line=Math.max(0,(q-(t.w-t.tw))/weekdaysLeft()),tl=line-t.tw;
+  $('#stats').innerHTML=[['Work this month',dur(t.w)],['Slack this month',dur(t.f)],['Today\'s work line',dur(line)],
+    [tl>=0?'Work left today':'Over today\'s line',dur(Math.abs(tl))],['Today: work',dur(t.tw)],['Today: slack',dur(t.tf)]]
+    .map(a=>'<div>'+a[0]+'<b>'+a[1]+'</b></div>').join('')}
+function renderLog(){
+  const n=new Date(),pre=prefix(n);
+  $('#mTitle').textContent='Daily log · '+MON[n.getMonth()]+' '+n.getFullYear();
+  const ks=Object.keys(db.days).filter(k=>k.indexOf(pre)===0&&(db.days[k].ss||[]).length).sort().reverse();
+  $('#log').innerHTML=ks.map(k=>{const r=db.days[k];return '<li><span>'+k.slice(5)+'</span><span>💼 '+dur(sessSum(r,'w'))+' · 🐟 '+dur(sessSum(r,'f'))+'</span></li>'}).join('')||'<li class="mu">Nothing logged this month yet</li>'}
+function render(){renderTimer();renderLog();renderQuota();tick()}
 
 $('#inT').addEventListener('change',e=>{if(e.target.value){day(key(new Date())).in=e.target.value;save();render()}});
 $('#nowBtn').onclick=()=>{const n=new Date();day(key(n)).in=pad(n.getHours())+':'+pad(n.getMinutes());save();render()};
@@ -213,19 +221,17 @@ $('#tBtn').onclick=()=>{
   else{db.run={t:type,n:$('#tName').value.trim(),s:Date.now()}}
   save();render()};
 $('#tList').onclick=e=>{const i=e.target.dataset.i;if(i===undefined)return;db.days[key(new Date())].ss.splice(+i,1);save();render()};
-$('#prev').onclick=()=>{vm--;if(vm<0){vm=11;vy--}renderMonth()};
-$('#next').onclick=()=>{vm++;if(vm>11){vm=0;vy++}renderMonth()};
-$('#cal').onclick=e=>{const k=e.target.closest('.d');if(!k)return;sel=k.dataset.k;renderMonth()};
+$('#qIn').addEventListener('change',e=>{db.quota=Math.max(1,+e.target.value||100);save();renderQuota()});
 $('#exp').onclick=()=>{
-  const rows=['Date,In,Out,Net (min),Work timer (min),Slack (min)'];
-  Object.keys(db.days).sort().forEach(k=>{const r=db.days[k],n=dayNet(k,r);rows.push([k,r.in||'',r.out||'',n===null?'':n,Math.round(sessSum(r,'w')/60),Math.round(sessSum(r,'f')/60)].join(','))});
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'}));a.download='moyu-'+key(new Date())+'.csv';a.click()};
+  const rows=['Date,Clock-in,Clock-out,Work (min),Slack (min)'];
+  Object.keys(db.days).sort().forEach(k=>{const r=db.days[k];rows.push([k,r.in||'',r.out||'',Math.round(sessSum(r,'w')/60),Math.round(sessSum(r,'f')/60)].join(','))});
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'}));a.download='slacker-'+key(new Date())+'.csv';a.click()};
 function boss(on){bossOn=on===undefined?!bossOn:on;$('#boss').style.display=bossOn?'block':'none';tick()}
 $('#bossBtn').onclick=()=>boss();
 $('#boss').onclick=()=>boss(false);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')boss()});
 
-render();setInterval(tick,1000);
+render();setInterval(()=>{tick();renderQuota()},1000);
 </script>
 </body>
 </html>
